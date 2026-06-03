@@ -1,0 +1,12 @@
+{
+	"name": "snippets/laravel-snippet-bundle",
+	"description": "Laravel framework runtime shipped to PHP.wasm for the <laravel-snippet> component",
+	"require": {
+		"php": "^8.2",
+		"laravel/framework": "^12.0"
+	},
+	"config": {
+		"optimize-autoloader": true,
+		"sort-packages": true
+	}
+}

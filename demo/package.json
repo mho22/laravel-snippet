@@ -1,0 +1,17 @@
+{
+	"name": "laravel-snippet",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"build:docs": "php build.php > index.html",
+		"dev": "npm run build:docs && vite --open /",
+		"build": "npm run build:docs && vite build"
+	},
+	"dependencies": {
+		"@php-wasm/web": "^3.1.36"
+	},
+	"devDependencies": {
+		"vite": "^5.4.0"
+	}
+}

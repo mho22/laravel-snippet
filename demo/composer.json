@@ -1,0 +1,6 @@
+{
+    "require": {
+        "php": "^8.2",
+        "league/commonmark": "^2.6"
+    }
+}

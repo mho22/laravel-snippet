@@ -1,0 +1,74 @@
+/* <laravel-snippet> additions only. The custom element wears
+ * `contains-code-blocks` so laravel.com's compiled Tailwind paints the inner
+ * `.code-block-wrapper > pre` exactly like a static docs code block; we just
+ * layer the runnable-snippet chrome on top. */
+
+laravel-snippet { display: block; }
+laravel-snippet > script { display: none; }
+laravel-snippet .code-block-wrapper pre > code:focus { outline: none; }
+
+/* Anchor the absolute-positioned controls to the wrapper itself. Laravel.com
+ * already gives `.code-block-wrapper { position: relative }` via
+ * `.contains-code-blocks > .code-block-wrapper`, so this just reinforces it. */
+laravel-snippet > .code-block-wrapper { position: relative; }
+
+/* ── Controls (status / copy / play) pinned top-right of the card ───── */
+laravel-snippet .laravel-snippet__controls {
+	position: absolute;
+	top: 0.75rem;
+	right: 0.75rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	z-index: 2;
+}
+laravel-snippet .laravel-snippet__status {
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	font-size: 0.7rem;
+	color: rgba(255, 255, 255, 0.55);
+	white-space: nowrap;
+}
+laravel-snippet .laravel-snippet__btn {
+	width: 1.9rem;
+	height: 1.9rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	background: transparent;
+	color: rgba(255, 255, 255, 0.55);
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+}
+laravel-snippet .laravel-snippet__btn:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: rgba(255, 255, 255, 0.85);
+}
+laravel-snippet .laravel-snippet__btn:disabled { opacity: 0.55; cursor: progress; }
+laravel-snippet .laravel-snippet__copy svg { width: 0.9rem; height: 0.9rem; }
+laravel-snippet .laravel-snippet__copy[data-copied="1"] { color: #5fdd7c; }
+laravel-snippet .laravel-snippet__run svg { width: 0.95rem; height: 0.95rem; }
+
+/* ── Output panel — sits inside the same <pre> as the input <code>, so
+ * it shares the laravel.com inner sand-dark-3 card. We only add a
+ * top-border separator and match the code element's padding so the
+ * output aligns column-wise with the input. */
+laravel-snippet .code-block-wrapper pre > .laravel-snippet__output {
+	position: relative; /* sit above the pre:before pseudo. */
+	z-index: 1;
+	margin: 0;
+	padding: calc(var(--spacing) * 6) calc(var(--spacing) * 5);
+	border-top: 1px solid #62605b40;
+	color: #BFC7D5;
+	font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+	font-size: 13px;
+	line-height: 1.7;
+	white-space: pre;
+	overflow-x: auto;
+	max-height: 32em;
+}
+.laravel-snippet__output .laravel-snippet__stderr {
+	display: block;
+	color: #ff7b72;
+}
