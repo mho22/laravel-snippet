@@ -1,0 +1,65 @@
+.laravel-snippet { display: block; }
+php-snippet { display: block; margin-bottom: 24px; }
+.laravel-snippet .code-block-wrapper pre > code:focus { outline: none; }
+.laravel-snippet > .code-block-wrapper { position: relative; }
+
+.laravel-snippet__controls {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    z-index: 2;
+}
+
+.laravel-snippet__status {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+}
+
+.laravel-snippet__btn {
+    width: 1.9rem;
+    height: 1.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.laravel-snippet__btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.laravel-snippet__btn:disabled { opacity: 0.55; cursor: progress; }
+.laravel-snippet__copy svg { width: 20px; height: 20px; }
+.laravel-snippet__copy[data-copied="1"] { color: #5fdd7c; }
+.laravel-snippet__run svg { width: 0.95rem; height: 0.95rem; }
+
+.laravel-snippet .code-block-wrapper pre > .laravel-snippet__output {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    padding: 1.5rem 1.25rem;
+    border-top: 1px solid #62605b40;
+    color: #BFC7D5;
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre;
+    overflow-x: auto;
+    max-height: 32em;
+}
+
+.laravel-snippet__output .laravel-snippet__stderr {
+    display: block;
+    color: #ff7b72;
+}

@@ -1,17 +1,27 @@
 {
-	"name": "laravel-snippet",
-	"private": true,
-	"version": "0.0.0",
-	"type": "module",
-	"scripts": {
-		"build:docs": "php build.php > index.html",
-		"dev": "npm run build:docs && vite --open /",
-		"build": "npm run build:docs && vite build"
-	},
-	"dependencies": {
-		"@php-wasm/web": "^3.1.36"
-	},
-	"devDependencies": {
-		"vite": "^5.4.0"
-	}
+    "$schema": "https://www.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build:worker": "node scripts/build-worker.mjs",
+        "build": "npm run build:worker && vite build",
+        "dev": "npm run build:worker && vite",
+        "prerender": "node scripts/prerender.mjs"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.0.0",
+        "@vitejs/plugin-vue": "^6.0.7",
+        "concurrently": "^9.0.1",
+        "esbuild": "^0.28.0",
+        "laravel-vite-plugin": "^3.1",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^6.0.3",
+        "vite": "^8.0.0",
+        "vue-tsc": "^3.3.3"
+    },
+    "dependencies": {
+        "@inertiajs/vue3": "^3.3.0",
+        "@php-wasm/web": "^3.1.36",
+        "vue": "^3.5.35"
+    }
 }

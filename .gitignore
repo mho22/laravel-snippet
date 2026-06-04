@@ -3,3 +3,6 @@ vendor/
 .env
 demo/index.html
 demo/.torchlight-cache/
+/docs/plans/
+/demo-legacy/
+/src/
