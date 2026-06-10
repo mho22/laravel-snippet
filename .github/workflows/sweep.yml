@@ -1,0 +1,170 @@
+name: Refresh snippet sweep report
+
+# Re-runs the 4,335-snippet sweep and uploads `report.{json,html}` as
+# the `snippet-report` artifact — no PR, no commit, no Pages deploy.
+# deploy.yml picks the artifact up (via `workflow_run`) and publishes
+# /report/ as part of its normal Pages build.
+#
+# Trigger logic:
+#   - push to main when files that influence the histogram change
+#     (bundle, markdown, snippet runtime, sweep spec)
+#   - Monday 06:00 UTC weekly safety net (catches drift even without
+#     local commits — laravel.com docs sync, dep updates, etc.)
+#   - manual via workflow_dispatch
+#
+# The sweep is single-worker by design (one PHP-WASM bundle install
+# per page); ~25 min real time.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'demo/wasm-bundle/**'
+      - 'demo/resources/markdown/13.x/**'
+      - 'demo/resources/js/components/LaravelSnippet.vue'
+      - 'demo/resources/js/runtime/**'
+      - 'demo/scripts/build-bundle.ts'
+      - 'demo/public/laravel.zip'
+      - 'demo/tests/browser/snippets.spec.ts'
+      - 'demo/tests/browser/build-report.ts'
+      - 'demo/playwright.config.ts'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, intl, xml, zip, dom
+          coverage: none
+          tools: composer:v2
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: demo/package-lock.json
+
+      - name: Composer install
+        working-directory: demo
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: NPM install
+        working-directory: demo
+        run: npm ci
+
+      - name: Install Playwright chromium
+        working-directory: demo
+        run: npx playwright install chromium --with-deps
+
+      - name: Prepare Laravel env
+        working-directory: demo
+        run: |
+          cp .env.example .env
+          # .env.example sets ASSET_URL=/laravel-snippet for the GH Pages
+          # subpath deploy. In CI the sweep hits the local artisan server
+          # at root (no prefix), so @vite emitting /laravel-snippet/build/...
+          # URLs (and the Vite modulepreload base baked into the bundle)
+          # would 404 every JS+CSS request → Vue never mounts → no snippet
+          # markup → Playwright times out on every page → report.json = [].
+          # Clear ASSET_URL so vite build + Laravel both emit /build/...
+          sed -i 's|^ASSET_URL=.*|ASSET_URL=|' .env
+          php artisan key:generate
+          touch database/database.sqlite
+          php artisan migrate --force
+
+      # laravel-vite-plugin refuses to start the Vite HMR server when CI=true
+      # (throws in ensureCommandShouldRunInEnvironment). Build the assets for
+      # production instead — artisan serves them via the @vite directive +
+      # public/build/manifest.json. Playwright then only needs :8000, and the
+      # vite webServer block in playwright.config.ts is skipped on CI via the
+      # PLAYWRIGHT_BASE_URL env var below.
+      - name: Build production assets
+        working-directory: demo
+        run: npm run build
+
+      - name: Start php artisan serve (background)
+        working-directory: demo
+        run: |
+          nohup php artisan serve --port=8000 </dev/null >/tmp/artisan.log 2>&1 &
+          disown
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000 >/dev/null 2>&1; then
+              echo "artisan ready in ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "artisan failed to bind to :8000 within 60s"
+          tail -n 200 /tmp/artisan.log || true
+          exit 1
+
+      # Run playwright and build-report as separate steps so a playwright
+      # failure fails the workflow loudly. The original `playwright test;
+      # node build-report.ts` in package.json silently masked failures as
+      # "success" because build-report regurgitated the committed report.
+      - name: Run playwright snippet sweep
+        working-directory: demo
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:8000
+        run: npx playwright test
+
+      - name: Build report HTML
+        if: always()
+        working-directory: demo
+        run: node tests/browser/build-report.ts
+
+      # Refuse to deploy a sweep that produced zero results. Without this
+      # guard, a silent CI failure (artisan didn't bind, route returned
+      # 500, bundle never loaded) leaves report.json as `[]` and ships
+      # an all-zero histogram to /report/, masking the breakage.
+      - name: Guard against zero-result sweep
+        working-directory: demo
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const results = JSON.parse(fs.readFileSync("tests/browser/report.json", "utf8"));
+            if (!Array.isArray(results) || results.length === 0) {
+              console.error("::error::Sweep produced 0 results — refusing to deploy. Check the artisan-log artifact + Playwright stdout for the root cause.");
+              process.exit(1);
+            }
+            console.log(`Sweep produced ${results.length} results — guard passed.`);
+          '
+
+      - name: Upload artisan log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artisan-log
+          path: /tmp/artisan.log
+          if-no-files-found: ignore
+
+      # Cross-workflow artifact: deploy.yml fetches this (on push to main
+      # via `gh run download`, or automatically via the `workflow_run`
+      # trigger after this workflow completes) and republishes /report/.
+      - name: Upload snippet-report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snippet-report
+          path: |
+            demo/tests/browser/report.json
+            demo/tests/browser/report.html
+          retention-days: 90
+          if-no-files-found: error

@@ -3,19 +3,29 @@ name: Deploy demo to GitHub Pages
 on:
   push:
     branches: [main]
+  # Auto-publish after a successful sweep so /report/ refreshes without
+  # a manual trigger. The trigger fires on every completed sweep, but
+  # `gh run list --status=success` in the fetch step filters out failures.
+  workflow_run:
+    workflows: ['Refresh snippet sweep report']
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read  # needed by `gh run download` to fetch sweep.yml artifacts
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false  # don't kill an in-flight sweep deploy
 
 jobs:
   build:
+    # Skip re-deploys triggered by failed sweep runs (the guard tripping,
+    # CI timeout, etc.). On push/workflow_dispatch this is always true.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,10 +39,10 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: Setup Node 20
+      - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: demo/package-lock.json
 
@@ -51,6 +61,34 @@ jobs:
           php artisan key:generate
           touch database/database.sqlite
           php artisan migrate --force
+
+      # report.{json,html} are no longer committed — pull them from
+      # the most recent successful sweep so prerender can copy them
+      # into dist/report/. If no sweep has run yet (or its artifact
+      # has expired past 90 days), prerender silently skips /report/.
+      - name: Fetch latest sweep report (best-effort)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          LATEST_RUN_ID=$(gh run list \
+            --workflow=sweep.yml \
+            --branch=main \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+          if [ -z "$LATEST_RUN_ID" ]; then
+            echo "No successful sweep runs found — /report/ will be omitted from this deploy."
+            exit 0
+          fi
+          echo "Downloading snippet-report from sweep run #$LATEST_RUN_ID"
+          if ! gh run download "$LATEST_RUN_ID" \
+              --name snippet-report \
+              --dir demo/tests/browser/ \
+              --repo "$GITHUB_REPOSITORY"; then
+            echo "::warning::snippet-report artifact not found on run #$LATEST_RUN_ID (likely expired) — /report/ will be omitted."
+          fi
 
       - name: Prerender static site
         working-directory: demo

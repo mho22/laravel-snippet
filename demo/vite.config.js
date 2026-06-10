@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 
@@ -21,7 +21,18 @@ const stripDeployPrefix = {
     },
 };
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+    // Read ASSET_URL out of .env — laravel-vite-plugin does this for its
+    // own purposes but doesn't expose it to user config, so call loadEnv
+    // ourselves. Empty in CI sweep, '/laravel-snippet' in prod GH Pages.
+    // Must match build-worker.ts's publicPath; otherwise the Vue bundle
+    // and the worker chunks disagree about where /snippet-worker/ lives.
+    const env = loadEnv(mode, process.cwd(), '');
+    const ASSET_PREFIX = env.ASSET_URL ?? '';
+    return {
+    define: {
+        __ASSET_PREFIX__: JSON.stringify(ASSET_PREFIX),
+    },
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.ts'],
@@ -49,4 +60,5 @@ export default defineConfig({
             '@': '/resources/js',
         },
     },
+    };
 });

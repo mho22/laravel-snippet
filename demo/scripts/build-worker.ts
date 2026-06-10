@@ -1,0 +1,79 @@
+import { build, type Plugin } from 'esbuild';
+import { readFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const outdir = path.join(root, 'public/snippet-worker');
+
+// vite.config.js reads ASSET_URL via vite's loadEnv(); esbuild has no
+// such helper, so parse demo/.env manually. Falls back to process.env
+// (CI step env: blocks) then empty (CI sweep — artisan serves at root).
+function readAssetUrl(): string {
+    if (typeof process.env.ASSET_URL === 'string') return process.env.ASSET_URL;
+    try {
+        const env = readFileSync(path.join(root, '.env'), 'utf8');
+        const m = env.match(/^ASSET_URL=(.*)$/m);
+        return m ? m[1].trim() : '';
+    } catch {
+        return '';
+    }
+}
+const ASSET_URL = readAssetUrl();
+
+await rm(outdir, { recursive: true, force: true });
+
+const stripUrlQuery: Plugin = {
+    name: 'strip-url-query',
+    setup(b) {
+        b.onResolve({ filter: /\?url$/ }, (args) => {
+            const real = args.path.replace(/\?url$/, '');
+            const resolved = path.isAbsolute(real)
+                ? real
+                : path.resolve(args.resolveDir, real);
+            return { path: resolved };
+        });
+    },
+};
+
+// `lightenBundle` previously stubbed out the JSPI loader and forced
+// `jspi()` to return false so asyncify was always picked. That kept the
+// bundle ~5.5 MB smaller but converted every JSPI-required code path
+// into an asyncify `unreachable` trap (the worker-error bucket). Now
+// removed — Chrome/Edge users get the JSPI runtime, others fall back
+// to asyncify automatically via @php-wasm's runtime feature-detect.
+
+await build({
+    entryPoints: [path.join(root, 'resources/js/runtime/worker.js')],
+    outdir,
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    target: 'es2022',
+    splitting: true,
+    external: [
+        'worker_threads',
+        '@php-wasm/web-5-2',
+        '@php-wasm/web-7-4',
+        '@php-wasm/web-8-0',
+        '@php-wasm/web-8-1',
+        '@php-wasm/web-8-2',
+        '@php-wasm/web-8-3',
+        '@php-wasm/web-8-4',
+    ],
+    entryNames: 'index',
+    chunkNames: 'chunks/[name]-[hash]',
+    assetNames: 'assets/[name]-[hash]',
+    loader: {
+        '.wasm': 'file',
+        '.dat': 'file',
+        '.so': 'file',
+    },
+    // Match the deploy ASSET_URL. Empty in CI sweep so artisan serves
+    // chunks at /snippet-worker/...; '/laravel-snippet' in deploy so
+    // GH Pages serves them at /laravel-snippet/snippet-worker/...
+    publicPath: `${ASSET_URL}/snippet-worker`,
+    plugins: [stripUrlQuery],
+    logLevel: 'info',
+});

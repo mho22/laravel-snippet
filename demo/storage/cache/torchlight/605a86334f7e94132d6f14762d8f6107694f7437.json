@@ -1,0 +1,13 @@
+{
+    "id": "605a86334f7e94132d6f14762d8f6107694f7437",
+    "language": "text tab=Cursor",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='text tab=Cursor' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">1. Open the command palette (`Cmd+Shift+P` or `Ctrl+Shift+P`)<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">2<\/span><span style=\"color: #BFC7D5;\">2. Press `enter` on &quot;\/open MCP Settings&quot;<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">3<\/span><span style=\"color: #BFC7D5;\">3. Turn the toggle on for `laravel-boost`<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">1. Open the command palette (`Cmd+Shift+P` or `Ctrl+Shift+P`)<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">2<\/span><span style=\"color: #BFC7D5;\">2. Press `enter` on &quot;\/open MCP Settings&quot;<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">3<\/span><span style=\"color: #BFC7D5;\">3. Turn the toggle on for `laravel-boost`<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "text tab=Cursor"
+    }
+}

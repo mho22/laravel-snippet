@@ -1,0 +1,13 @@
+{
+    "id": "79900c5c845b180e2e4c238fc9645acc7c5a037d",
+    "language": "shell",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='shell' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">php <\/span><span style=\"color: #BFC7D5;\">artisan<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">config:publish<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">concurrency<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">php <\/span><span style=\"color: #BFC7D5;\">artisan<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">config:publish<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">concurrency<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "shell"
+    }
+}

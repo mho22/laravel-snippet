@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 return [
-    // scripts/prerender.mjs refreshes this on each deploy; the default is the
-    // local-dev fallback for when laravel.com rotates the hash.
-    'css_href' => env('LARAVEL_DOCS_CSS_HREF', 'https://laravel.com/build/assets/app-CpSub1jt.css'),
+    // scripts/sync-docs-css.mjs downloads the current laravel.com docs CSS to
+    // public/laravel-docs.css before each dev/build/prerender; the prerender
+    // overrides this env var to use the GH Pages base path.
+    'css_href' => env('LARAVEL_DOCS_CSS_HREF', '/laravel-docs.css'),
     'torchlight_theme' => 'olaolu-palenight',
     'torchlight_cache' => storage_path('cache/torchlight'),
     'markdown_file' => resource_path('markdown/collections.md'),
+    'docs_root' => resource_path('markdown/13.x'),
 ];

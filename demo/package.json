@@ -3,12 +3,16 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build:worker": "node scripts/build-worker.mjs",
-        "build": "npm run build:worker && vite build",
-        "dev": "npm run build:worker && vite",
-        "prerender": "node scripts/prerender.mjs"
+        "build:worker": "node scripts/build-worker.ts",
+        "build:bundle": "node scripts/build-bundle.ts",
+        "sync:assets": "node scripts/sync-assets.ts",
+        "build": "npm run sync:assets && npm run build:worker && vite build",
+        "dev": "npm run sync:assets && npm run build:worker && vite",
+        "prerender": "node scripts/prerender.ts",
+        "test:snippets": "playwright test; node tests/browser/build-report.ts"
     },
     "devDependencies": {
+        "@playwright/test": "^1.49.0",
         "@tailwindcss/vite": "^4.0.0",
         "@vitejs/plugin-vue": "^6.0.7",
         "concurrently": "^9.0.1",

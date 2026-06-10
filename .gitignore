@@ -4,5 +4,10 @@ vendor/
 demo/index.html
 demo/.torchlight-cache/
 /docs/plans/
-/demo-legacy/
 /src/
+*.bak
+
+# Sweep output — produced fresh in CI by sweep.yml, never committed.
+# deploy.yml downloads the latest snippet-report artifact before prerender.
+demo/tests/browser/report.json
+demo/tests/browser/report.html

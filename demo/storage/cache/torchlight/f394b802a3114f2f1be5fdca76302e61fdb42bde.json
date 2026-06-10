@@ -1,0 +1,13 @@
+{
+    "id": "f394b802a3114f2f1be5fdca76302e61fdb42bde",
+    "language": "js",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='js' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">Echo<\/span><span style=\"color: #C792EA;\">.<\/span><span style=\"color: #82AAFF;\">leaveChannel<\/span><span style=\"color: #BFC7D5;\">(<\/span><span style=\"color: #BFC7D5;\">`<\/span><span style=\"color: #C3E88D;\">orders.<\/span><span style=\"color: #D3423E;\">${<\/span><span style=\"color: #FF5572;\">this<\/span><span style=\"color: #C792EA;\">.<\/span><span style=\"color: #89DDFF;\">order<\/span><span style=\"color: #C792EA;\">.<\/span><span style=\"color: #89DDFF;\">id<\/span><span style=\"color: #D3423E;\">}<\/span><span style=\"color: #BFC7D5;\">`<\/span><span style=\"color: #BFC7D5;\">);<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">Echo<\/span><span style=\"color: #C792EA;\">.<\/span><span style=\"color: #82AAFF;\">leaveChannel<\/span><span style=\"color: #BFC7D5;\">(<\/span><span style=\"color: #BFC7D5;\">`<\/span><span style=\"color: #C3E88D;\">orders.<\/span><span style=\"color: #D3423E;\">${<\/span><span style=\"color: #FF5572;\">this<\/span><span style=\"color: #C792EA;\">.<\/span><span style=\"color: #89DDFF;\">order<\/span><span style=\"color: #C792EA;\">.<\/span><span style=\"color: #89DDFF;\">id<\/span><span style=\"color: #D3423E;\">}<\/span><span style=\"color: #BFC7D5;\">`<\/span><span style=\"color: #BFC7D5;\">);<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "js"
+    }
+}
