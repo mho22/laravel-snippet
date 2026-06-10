@@ -15,11 +15,6 @@ final class CollectionsController
         return $this->renderPage($markdown, 'Collections');
     }
 
-    public function playground(MarkdownService $markdown): Response
-    {
-        return $this->renderPage($markdown, 'PlaygroundCollections');
-    }
-
     private function renderPage(MarkdownService $markdown, string $component): Response
     {
         $source = (string) file_get_contents(config('docs.markdown_file'));

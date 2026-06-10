@@ -1,0 +1,13 @@
+{
+    "id": "5a1cb0905595e279dfe690db2111c07b42c13678",
+    "language": "text",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='text' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">\/\/ Laravel &lt;= 12.x<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">2<\/span><span style=\"color: #BFC7D5;\">Reset Password Notification<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">3<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">4<\/span><span style=\"color: #BFC7D5;\">\/\/ Laravel &gt;= 13.x<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">5<\/span><span style=\"color: #BFC7D5;\">Reset your password<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">\/\/ Laravel &lt;= 12.x<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">2<\/span><span style=\"color: #BFC7D5;\">Reset Password Notification<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">3<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">4<\/span><span style=\"color: #BFC7D5;\">\/\/ Laravel &gt;= 13.x<\/span><\/div><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">5<\/span><span style=\"color: #BFC7D5;\">Reset your password<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "text"
+    }
+}

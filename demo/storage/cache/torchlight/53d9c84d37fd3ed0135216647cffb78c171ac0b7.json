@@ -1,0 +1,13 @@
+{
+    "id": "53d9c84d37fd3ed0135216647cffb78c171ac0b7",
+    "language": "shell",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='shell' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">valet <\/span><span style=\"color: #BFC7D5;\">unsecure<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">laravel<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">valet <\/span><span style=\"color: #BFC7D5;\">unsecure<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">laravel<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "shell"
+    }
+}

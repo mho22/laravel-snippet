@@ -13,6 +13,7 @@ import { runPhp, runTokenize } from '@/runtime/php';
 const props = defineProps<{
     php: string;
     highlighted: string;
+    preamble?: string;
 }>();
 
 const OUTLINE_ATTRS =
@@ -52,9 +53,102 @@ function readSource(): string {
         .map((line) => {
             const clone = line.cloneNode(true) as HTMLElement;
             clone.querySelector('.line-number')?.remove();
-            return clone.textContent ?? '';
+            // The line highlighter renders blank lines as `<span> </span>`
+            // — a single U+00A0 (non-breaking space) so the line keeps
+            // height. PHP can't lex NBSP as whitespace, so anything past
+            // a blank line errors with "unexpected identifier …". Strip.
+            return (clone.textContent ?? '').replace(/ /g, ' ');
         })
         .join('\n');
+}
+
+// Skip over `<?php`, optional `declare()`, optional `namespace X;` or `namespace X {`,
+// optional run of `use ...;` lines (with intervening blanks). Returns the byte index
+// where the snippet's actual "body" begins.
+function structuralPrefixEnd(source: string): number {
+    let i = 0;
+    const openRe = /^[ \t\r\n]*<\?php[ \t\r\n]*/;
+    const om = source.match(openRe);
+    if (om) i += om[0].length;
+    const declRe = /^declare\s*\([^)]*\)\s*;[ \t\r\n]*/;
+    const dm = source.slice(i).match(declRe);
+    if (dm) i += dm[0].length;
+    const nsRe = /^namespace\s+[\w\\]+\s*[;{][ \t\r\n]*/;
+    const nm = source.slice(i).match(nsRe);
+    if (nm) i += nm[0].length;
+    // Consume any run of: blank lines, line comments, docblocks, and `use ...;`.
+    while (true) {
+        const tail = source.slice(i);
+        const blank = tail.match(/^[ \t]*\r?\n/);
+        if (blank) { i += blank[0].length; continue; }
+        const lineComment = tail.match(/^[ \t]*\/\/[^\n]*\n?/);
+        if (lineComment) { i += lineComment[0].length; continue; }
+        const blockComment = tail.match(/^[ \t]*\/\*[\s\S]*?\*\/[ \t]*\r?\n?/);
+        if (blockComment) { i += blockComment[0].length; continue; }
+        const useStmt = tail.match(/^use\s+(?:function\s+|const\s+)?[\\\w\s,{}]+?;[ \t]*\r?\n?/);
+        if (useStmt) { i += useStmt[0].length; continue; }
+        break;
+    }
+    return i;
+}
+
+// Does the body (everything after the structural prefix) start with a class-member
+// declaration? Used to decide whether to wrap in `class X { ... }` so the parser
+// accepts a member fragment that the docs show in isolation.
+function bodyStartsWithClassMember(body: string): boolean {
+    const firstLine = body
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l !== '' && !l.startsWith('//') && !l.startsWith('/*') && !l.startsWith('*'));
+    if (!firstLine) return false;
+    return /^(public|protected|private|abstract|final|static|readonly)\b/.test(firstLine);
+}
+
+// Does the body reference `$this` outside a nested class/closure that establishes
+// its own object context? Quick heuristic: source mentions `$this` and does not
+// itself declare a class wrapping it. The docs use this shape to show ServiceProvider
+// methods (`$this->app->bind(...)`) and console-command bodies (`$this->info(...)`).
+function bodyUsesThisAtTopLevel(body: string): boolean {
+    if (!/\$this\b/.test(body)) return false;
+    // If the body itself declares a `class X { ... }`, the `$this` is presumably
+    // inside that class. Don't double-wrap; let it through unmodified.
+    return !/\bclass\s+\w+\b[^;]*\{/.test(body);
+}
+
+// Build the executable source: the visible source with the page-context preamble
+// injected and, if the snippet looks like a class-member fragment, wrapped in
+// `new class { ... };`. The user never sees either transformation.
+function buildExecutable(): string {
+    const visible = readSource();
+    const prefixEnd = structuralPrefixEnd(visible);
+    const prefix = visible.slice(0, prefixEnd);
+    const body = visible.slice(prefixEnd);
+
+    const preamble = props.preamble?.trim() ?? '';
+    const useLines = preamble ? preamble + '\n' : '';
+
+    // Named class declaration — not `new class { ... }`, which would also
+    // instantiate the class and call the constructor (often with required
+    // args the snippet doesn't pretend to pass). A random suffix avoids
+    // "Cannot redeclare class" across successive runs in the same worker.
+    const wrapName = '__Snippet_' + Math.random().toString(36).slice(2);
+
+    if (bodyStartsWithClassMember(body)) {
+        return prefix + useLines + 'class ' + wrapName + ' {\n' + body + '\n}\n';
+    }
+    if (bodyUsesThisAtTopLevel(body)) {
+        // `$this` outside a method body is illegal at execution, not at parse.
+        // Declaring (but not calling) a wrapper method lets the snippet parse;
+        // its body never runs, so `$this` stays inert. Snippets in this shape
+        // are illustrative — the docs reader sees the method body, not output.
+        return (
+            prefix + useLines +
+            'class ' + wrapName + ' {\n' +
+            'public function __snippetRun() {\n' + body + '\n}\n' +
+            '}\n'
+        );
+    }
+    return prefix + useLines + body;
 }
 
 async function rehighlight() {
@@ -91,7 +185,7 @@ async function execute() {
     status.value = 'Running…';
     outputHtml.value = '';
     try {
-        const result = await runPhp(readSource());
+        const result = await runPhp(buildExecutable());
         const parts: string[] = [];
         if (result.stdout) parts.push(ansiToHtml(result.stdout));
         if (result.stderr) {
@@ -105,7 +199,14 @@ async function execute() {
                 ? `${Math.round(result.tRun)} ms`
                 : `exit ${result.exitCode} · ${Math.round(result.tRun)} ms`;
     } catch (err) {
-        outputHtml.value = escapeHtml(String(err));
+        const msg =
+            err instanceof Error
+                ? err.message
+                : err && typeof err === 'object' && 'message' in err
+                  ? String((err as { message: unknown }).message)
+                  : String(err);
+        console.error('[laravel-snippet]', err);
+        outputHtml.value = `<span class="laravel-snippet__stderr">${escapeHtml(msg)}</span>`;
         status.value = 'error';
     } finally {
         running.value = false;
