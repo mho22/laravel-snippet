@@ -11,10 +11,11 @@
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true,
         "noEmit": true,
-        "types": ["vite/client"],
+        "allowImportingTsExtensions": true,
+        "types": ["vite/client", "node"],
         "paths": {
             "@/*": ["./resources/js/*"]
         }
     },
-    "include": ["resources/js/**/*.ts", "resources/js/**/*.vue"]
+    "include": ["resources/js/**/*.ts", "resources/js/**/*.vue", "scripts/**/*.ts", "tests/**/*.ts"]
 }

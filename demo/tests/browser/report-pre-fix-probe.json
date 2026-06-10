@@ -1,0 +1,142 @@
+[
+  {
+    "page": "helpers",
+    "index": 0,
+    "bucket": "ran-ok",
+    "status": "234 ms",
+    "outputPreview": "false"
+  },
+  {
+    "page": "helpers",
+    "index": 1,
+    "bucket": "ran-ok",
+    "status": "33 ms",
+    "outputPreview": "array:2 [\n  \"name\" => \"Desk\"\n  \"price\" => 100\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 2,
+    "bucket": "ran-ok",
+    "status": "29 ms",
+    "outputPreview": "array:9 [\n  0 => 1\n  1 => 2\n  2 => 3\n  3 => 4\n  4 => 5\n  5 => 6\n  6 => 7\n  7 => 8\n  8 => 9\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 3,
+    "bucket": "ran-ok",
+    "status": "30 ms",
+    "outputPreview": "array:8 [\n  0 => array:3 [\n    0 => 1\n    1 => \"a\"\n    2 => \"I\"\n  ]\n  1 => array:3 [\n    0 => 1\n    1 => \"a\"\n    2 => \"II\"\n  ]\n  2 => array:3 [\n    0 => 1\n    1 => \"b\"\n    2 => \"I\"\n  ]\n  3 => array:3 [\n    0 => 1\n    1 => \"b\"\n    2 => \"II\"\n  ]\n  4 => array:3 [\n    0 => 2\n    1 => \"a\"\n    2 => \"I\"\n  ]\n  5 => array:3 [\n    0 => 2\n    1 => \"a\"\n    2 => \"II\"\n  ]\n  6 => array:3 [\n    0 => 2\n    1 => \"b\"\n    2 => \"I\"\n  ]\n  7 => array:3 [\n    0 => 2\n    1 => \"b\"\n    2 => \"II\"\n  ]\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 4,
+    "bucket": "ran-ok",
+    "status": "29 ms",
+    "outputPreview": "array:1 [\n  0 => \"Desk\"\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 5,
+    "bucket": "ran-ok",
+    "status": "32 ms",
+    "outputPreview": "array:1 [\n  \"products.desk.price\" => 100\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 6,
+    "bucket": "ran-ok",
+    "status": "31 ms",
+    "outputPreview": "true\nfalse\narray:3 [\n  0 => 1\n  1 => 2\n  2 => 3\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 7,
+    "bucket": "ran-ok",
+    "status": "31 ms",
+    "outputPreview": "array:1 [\n  \"name\" => \"Desk\"\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 8,
+    "bucket": "ran-ok",
+    "status": "29 ms",
+    "outputPreview": "array:2 [\n  1 => \"bar\"\n  3 => \"qux\"\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 9,
+    "bucket": "ran-ok",
+    "status": "31 ms",
+    "outputPreview": "array:2 [\n  1 => \"1\"\n  3 => \"2\"\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 10,
+    "bucket": "ran-ok",
+    "status": "31 ms",
+    "outputPreview": "false"
+  },
+  {
+    "page": "helpers",
+    "index": 11,
+    "bucket": "ran-ok",
+    "status": "31 ms",
+    "outputPreview": "200"
+  },
+  {
+    "page": "helpers",
+    "index": 12,
+    "bucket": "ran-ok",
+    "status": "29 ms",
+    "outputPreview": "1"
+  },
+  {
+    "page": "helpers",
+    "index": 13,
+    "bucket": "ran-ok",
+    "status": "30 ms",
+    "outputPreview": "array:3 [\n  0 => \"Joe\"\n  1 => \"PHP\"\n  2 => \"Ruby\"\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 14,
+    "bucket": "ran-ok",
+    "status": "32 ms",
+    "outputPreview": "array:1 [\n  \"products\" => []\n]"
+  },
+  {
+    "page": "helpers",
+    "index": 15,
+    "bucket": "ran-with-stderr",
+    "status": "33 ms",
+    "outputPreview": "array:1 [\n  \"foo\" => \"bar\"\n]\n\n\nError: Interface \"Jsonable\" not found"
+  },
+  {
+    "page": "helpers",
+    "index": 16,
+    "bucket": "ran-ok",
+    "status": "29 ms",
+    "outputPreview": "100"
+  },
+  {
+    "page": "helpers",
+    "index": 17,
+    "bucket": "ran-ok",
+    "status": "30 ms",
+    "outputPreview": "0"
+  },
+  {
+    "page": "helpers",
+    "index": 18,
+    "bucket": "ran-ok",
+    "status": "30 ms",
+    "outputPreview": "false"
+  },
+  {
+    "page": "helpers",
+    "index": 19,
+    "bucket": "ran-ok",
+    "status": "30 ms",
+    "outputPreview": "true\ntrue\nfalse\narray:2 [\n  \"name\" => \"Taylor\"\n  \"language\" => \"PHP\"\n]"
+  }
+]

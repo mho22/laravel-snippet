@@ -15,7 +15,7 @@
 <div class="mx-auto max-w-[1400px] border-l border-neutral-200 dark:border-neutral-700">
     <div class="px-4 xl:px-16">
         <div id="docsScreen" class="grid grid-cols-12 gap-4 px-6 pt-10 lg:gap-6 lg:px-0 xl:gap-x-10">
-{!! file_get_contents(resource_path('views/partials/sidebar.html')) !!}
+@include('partials.sidebar')
             <section class="col-span-12 lg:col-span-9 xl:col-span-6">
                 <section class="docs_main max-w-prose">
                     @inertia

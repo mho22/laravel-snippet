@@ -1,0 +1,164 @@
+name: Refresh snippet sweep report
+
+# Re-runs the 4,335-snippet sweep and opens a PR with the refreshed
+# tests/browser/report.{json,html}. Trigger logic:
+#   - push to main when files that influence the histogram change
+#     (bundle, markdown, snippet runtime, sweep spec)
+#   - Monday 06:00 UTC weekly safety net (catches drift even without
+#     local commits — laravel.com docs sync, dep updates, etc.)
+#   - manual via workflow_dispatch
+#
+# The sweep is single-worker by design (one PHP-WASM bundle install
+# per page); ~25 min real time.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'demo/wasm-bundle/**'
+      - 'demo/resources/markdown/13.x/**'
+      - 'demo/resources/js/components/LaravelSnippet.vue'
+      - 'demo/resources/js/runtime/**'
+      - 'demo/scripts/build-bundle.ts'
+      - 'demo/public/laravel.zip'
+      - 'demo/tests/browser/snippets.spec.ts'
+      - 'demo/tests/browser/build-report.ts'
+      - 'demo/playwright.config.ts'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, intl, xml, zip, dom
+          coverage: none
+          tools: composer:v2
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: demo/package-lock.json
+
+      - name: Composer install
+        working-directory: demo
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: NPM install
+        working-directory: demo
+        run: npm ci
+
+      - name: Install Playwright chromium
+        working-directory: demo
+        run: npx playwright install chromium --with-deps
+
+      - name: Prepare Laravel env
+        working-directory: demo
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          touch database/database.sqlite
+          php artisan migrate --force
+
+      # laravel-vite-plugin refuses to start the Vite HMR server when CI=true
+      # (throws in ensureCommandShouldRunInEnvironment). Build the assets for
+      # production instead — artisan serves them via the @vite directive +
+      # public/build/manifest.json. Playwright then only needs :8000, and the
+      # vite webServer block in playwright.config.ts is skipped on CI via the
+      # PLAYWRIGHT_BASE_URL env var below.
+      - name: Build production assets
+        working-directory: demo
+        run: npm run build
+
+      - name: Start php artisan serve (background)
+        working-directory: demo
+        run: |
+          nohup php artisan serve --port=8000 </dev/null >/tmp/artisan.log 2>&1 &
+          disown
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000 >/dev/null 2>&1; then
+              echo "artisan ready in ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "artisan failed to bind to :8000 within 60s"
+          tail -n 200 /tmp/artisan.log || true
+          exit 1
+
+      # Run playwright and build-report as separate steps so a playwright
+      # failure fails the workflow loudly. The original `playwright test;
+      # node build-report.ts` in package.json silently masked failures as
+      # "success" because build-report regurgitated the committed report.
+      - name: Run playwright snippet sweep
+        working-directory: demo
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:8000
+        run: npx playwright test
+
+      - name: Build report HTML
+        if: always()
+        working-directory: demo
+        run: node tests/browser/build-report.ts
+
+      - name: Upload artisan log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artisan-log
+          path: /tmp/artisan.log
+          if-no-files-found: ignore
+
+      - name: Detect changes
+        id: diff
+        working-directory: demo
+        run: |
+          git add tests/browser/report.json tests/browser/report.html
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --cached --stat
+          fi
+
+      - name: Open PR
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: |
+            demo/tests/browser/report.json
+            demo/tests/browser/report.html
+          branch: chore/refresh-snippet-sweep-report
+          commit-message: 'chore: refresh snippet sweep report'
+          title: 'chore: refresh snippet sweep report'
+          body: |
+            Refreshed snippet sweep — re-ran `npm run test:snippets` against
+            the current bundle + markdown + runtime, updates
+            `demo/tests/browser/report.{json,html}`.
+
+            Review the diff stat for bucket changes (`ran-ok` /
+            `ran-with-stderr` / `no-output` / etc.) before merging — once
+            this lands on `main`, the deploy workflow republishes the
+            report at `https://mho22.github.io/laravel-snippet/report/`.
+
+            Generated by `.github/workflows/sweep.yml`.
+          delete-branch: true

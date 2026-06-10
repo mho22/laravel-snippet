@@ -3,6 +3,8 @@ vendor/
 .env
 demo/index.html
 demo/.torchlight-cache/
+demo/public/laravel-docs.css
+demo/public/laravel-docs-assets/
 /docs/plans/
-/demo-legacy/
 /src/
+*.bak
