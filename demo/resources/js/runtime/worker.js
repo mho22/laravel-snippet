@@ -38,6 +38,63 @@ self.addEventListener('unhandledrejection', (e) => {
 	self.postMessage({ type: 'fatal', stage: 'unhandledrejection', ...detail });
 });
 
+// Fallback denominator while Content-Length headers are still arriving,
+// so the percentage doesn't swing wildly on the first few chunks. Real
+// sum supersedes once enough fetches have started.
+const PROGRESS_BYTES_ESTIMATE = 70 * 1024 * 1024;
+// Reserve the 95–100% band for the post-download WASM compile and zip
+// extract; emitProgress(100) on the main thread fires from `ready`.
+const PROGRESS_BYTES_CAP = 95;
+let bytesReceived = 0;
+let bytesTotal = 0;
+let lastProgressPost = 0;
+
+function postProgress() {
+	const now = performance.now();
+	if (now - lastProgressPost < 100) return;
+	lastProgressPost = now;
+	const denom = Math.max(bytesTotal, PROGRESS_BYTES_ESTIMATE);
+	const pct = Math.min(PROGRESS_BYTES_CAP, Math.floor((bytesReceived / denom) * PROGRESS_BYTES_CAP));
+	self.postMessage({ type: 'progress', percent: pct });
+}
+
+// @php-wasm exposes no progress hook for its internal WASM/ICU/intl
+// fetches, so we tee every Response through a byte counter at the
+// `self.fetch` boundary. Restored to the original after `ready` so
+// runtime fetches (e.g. Laravel's Http::get over tcpOverFetch) don't
+// emit progress messages that would overwrite "Running…".
+const originalFetch = self.fetch.bind(self);
+self.fetch = async function trackedFetch(input, init) {
+	const response = await originalFetch(input, init);
+	if (!response.ok || !response.body) return response;
+	const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+	if (contentLength > 0) bytesTotal += contentLength;
+	const reader = response.body.getReader();
+	const stream = new ReadableStream({
+		async start(controller) {
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) {
+						controller.close();
+						break;
+					}
+					bytesReceived += value.byteLength;
+					postProgress();
+					controller.enqueue(value);
+				}
+			} catch (err) {
+				controller.error(err);
+			}
+		},
+	});
+	return new Response(stream, {
+		status: response.status,
+		statusText: response.statusText,
+		headers: response.headers,
+	});
+};
+
 let php;
 let initError = null;
 try {
@@ -59,6 +116,7 @@ try {
 		log_errors: '0',
 	});
 	await installBundle(php);
+	self.fetch = originalFetch;
 	self.postMessage({ type: 'ready' });
 } catch (err) {
 	initError = err;

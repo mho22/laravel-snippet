@@ -8,7 +8,7 @@ import {
     getCaretLineCol,
     setCaretLineCol,
 } from '@/runtime/highlight';
-import { runPhp, runTokenize } from '@/runtime/php';
+import { onWorkerProgress, prewarmWorker, runPhp, runTokenize } from '@/runtime/php';
 
 const props = defineProps<{
     php: string;
@@ -43,6 +43,15 @@ onMounted(() => {
     el.innerHTML = props.highlighted;
     for (const num of el.querySelectorAll<HTMLElement>('.line-number')) {
         num.setAttribute('contenteditable', 'false');
+    }
+    // Pull the worker's ~75 MB of assets during idle so first-click is fast.
+    const idle = (window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    }).requestIdleCallback;
+    if (typeof idle === 'function') {
+        idle(() => prewarmWorker(), { timeout: 2000 });
+    } else {
+        window.setTimeout(prewarmWorker, 200);
     }
 });
 
@@ -104,15 +113,71 @@ function bodyStartsWithClassMember(body: string): boolean {
     return /^(public|protected|private|abstract|final|static|readonly)\b/.test(firstLine);
 }
 
-// Does the body reference `$this` outside a nested class/closure that establishes
-// its own object context? Quick heuristic: source mentions `$this` and does not
-// itself declare a class wrapping it. The docs use this shape to show ServiceProvider
-// methods (`$this->app->bind(...)`) and console-command bodies (`$this->info(...)`).
+// Does the body reference `$this` at brace depth 0 — i.e. outside any closure
+// or class body that would give it a binding? Snippets shaped like
+// `$this->app->bind(...)` (ServiceProvider body in isolation) need the wrap;
+// snippets like `Collection::macro('x', function () { $this->map(...); })` do
+// NOT — Macroable rebinds the closure to the collection at call time, so the
+// inner `$this` resolves at runtime. A plain regex on `\$this\b` can't tell
+// these apart and incorrectly wraps the macro form, declaring an uncalled
+// method so the macro never registers (silent "(no output)").
 function bodyUsesThisAtTopLevel(body: string): boolean {
     if (!/\$this\b/.test(body)) return false;
-    // If the body itself declares a `class X { ... }`, the `$this` is presumably
-    // inside that class. Don't double-wrap; let it through unmodified.
-    return !/\bclass\s+\w+\b[^;]*\{/.test(body);
+    // `class X { ... }` body — wrap would double-wrap; bail.
+    if (/\bclass\s+\w+\b[^;]*\{/.test(body)) return false;
+    // Walk source tracking strings, comments, and brace depth. A `$this`
+    // token at depth 0 means top-level; anything deeper sits inside a
+    // closure or anon class that establishes its own object binding.
+    const n = body.length;
+    let i = 0;
+    let depth = 0;
+    while (i < n) {
+        const c = body[i];
+        if (c === '/' && body[i + 1] === '/') {
+            while (i < n && body[i] !== '\n') i++;
+            continue;
+        }
+        if (c === '/' && body[i + 1] === '*') {
+            i += 2;
+            while (i < n - 1 && !(body[i] === '*' && body[i + 1] === '/')) i++;
+            i += 2;
+            continue;
+        }
+        if (c === '#' && body[i + 1] !== '[') {
+            while (i < n && body[i] !== '\n') i++;
+            continue;
+        }
+        if (c === "'") {
+            i++;
+            while (i < n) {
+                if (body[i] === '\\') { i += 2; continue; }
+                if (body[i] === "'") { i++; break; }
+                i++;
+            }
+            continue;
+        }
+        if (c === '"') {
+            i++;
+            while (i < n) {
+                if (body[i] === '\\') { i += 2; continue; }
+                if (body[i] === '"') { i++; break; }
+                i++;
+            }
+            continue;
+        }
+        if (c === '{') { depth++; i++; continue; }
+        if (c === '}') { depth--; i++; continue; }
+        if (
+            depth === 0 &&
+            c === '$' &&
+            body.startsWith('$this', i) &&
+            !/[A-Za-z0-9_]/.test(body[i + 5] ?? '')
+        ) {
+            return true;
+        }
+        i++;
+    }
+    return false;
 }
 
 // Build the executable source: the visible source with the page-context preamble
@@ -182,8 +247,10 @@ function onInput() {
 async function execute() {
     if (running.value) return;
     running.value = true;
-    status.value = 'Running…';
     outputHtml.value = '';
+    const unsubProgress = onWorkerProgress((p) => {
+        status.value = p < 100 ? `${p}%` : 'Running…';
+    });
     try {
         const result = await runPhp(buildExecutable());
         const parts: string[] = [];
@@ -209,6 +276,7 @@ async function execute() {
         outputHtml.value = `<span class="laravel-snippet__stderr">${escapeHtml(msg)}</span>`;
         status.value = 'error';
     } finally {
+        unsubProgress();
         running.value = false;
         mode.value = 'reset';
     }

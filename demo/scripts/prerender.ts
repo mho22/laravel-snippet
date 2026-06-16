@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { injectSnippetPreloads } from './inject-snippet-preloads.ts';
+
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEMO_DIR = join(SCRIPT_DIR, '..');
 const PRERENDER_PORT = 8765;
@@ -36,14 +38,16 @@ async function renderRoute(
     path: string,
     outFile: string,
     urlSearch: string,
-    urlReplace: string
+    urlReplace: string,
+    transform?: (html: string) => string
 ): Promise<void> {
     console.log(`[prerender] fetching ${path}`);
     const res = await fetch(`http://${ARTISAN_HOST}:${PRERENDER_PORT}${path}`);
     if (!res.ok) {
         throw new Error(`Render fetch failed for ${path}: HTTP ${res.status}`);
     }
-    const html = (await res.text()).replace(urlSearch, urlReplace);
+    let html = (await res.text()).replace(urlSearch, urlReplace);
+    if (transform) html = transform(html);
     await mkdir(dirname(outFile), { recursive: true });
     await writeFile(outFile, html, 'utf8');
 }
@@ -174,7 +178,8 @@ async function main(): Promise<void> {
             '/snippets/laravel',
             join(DIST_DIR, 'snippets', 'laravel', 'index.html'),
             '"url":"\\/snippets\\/laravel"',
-            '"url":"\\/laravel-snippet\\/snippets\\/laravel\\/"'
+            '"url":"\\/laravel-snippet\\/snippets\\/laravel\\/"',
+            injectSnippetPreloads
         );
 
         console.log('[prerender] enumerating docs pages');
@@ -189,7 +194,7 @@ async function main(): Promise<void> {
             if (!res.ok) {
                 throw new Error(`Render fetch failed for ${path}: HTTP ${res.status}`);
             }
-            const html = rewriteForGhPages(await res.text(), route);
+            const html = injectSnippetPreloads(rewriteForGhPages(await res.text(), route));
             await mkdir(dirname(outFile), { recursive: true });
             await writeFile(outFile, html, 'utf8');
         }

@@ -3,6 +3,13 @@ import { readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+    ALL_BUCKETS,
+    classify,
+    isTerminalStatus,
+    type Bucket,
+} from './sweep-status.ts';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -23,23 +30,6 @@ const PAGE_FILTER = process.env.SNIPPET_PAGE
 const STATUS_POLL_TIMEOUT = 15_000;
 const FLUSH_EVERY = 25;
 
-type Bucket =
-    | 'ran-ok'
-    | 'ran-with-stderr'
-    | 'ran-exit-nonzero'
-    | 'worker-error'
-    | 'no-output'
-    | 'never-completed';
-
-const ALL_BUCKETS: Bucket[] = [
-    'ran-ok',
-    'ran-with-stderr',
-    'ran-exit-nonzero',
-    'worker-error',
-    'no-output',
-    'never-completed',
-];
-
 interface SnippetResult {
     page: string;
     index: number;
@@ -53,35 +43,6 @@ function enumeratePages(): string[] {
         .filter((f) => f.endsWith('.md'))
         .map((f) => f.replace(/\.md$/, ''))
         .sort();
-}
-
-function classify(
-    status: string,
-    outputText: string,
-    stderrCount: number,
-): Bucket {
-    if (status === 'error') return 'worker-error';
-    if (status.startsWith('exit ')) {
-        // `dd()`, `Benchmark::dd()`, `$collection->dd()` print the requested
-        // dump to stdout and then exit(1). That's documented Laravel behavior
-        // — the snippet ran exactly as the docs reader expects. Anything
-        // that printed real output to stdout and emitted no stderr is a
-        // successful run regardless of the non-zero exit code.
-        const trimmed = outputText.trim();
-        const hasOutput = trimmed !== '' && trimmed !== '(no output)';
-        if (status.startsWith('exit 1 ') && stderrCount === 0 && hasOutput) {
-            return 'ran-ok';
-        }
-        return 'ran-exit-nonzero';
-    }
-    if (/^\d+\s+ms$/.test(status)) {
-        if (stderrCount > 0) return 'ran-with-stderr';
-        if (outputText.trim() === '' || outputText.trim() === '(no output)') {
-            return 'no-output';
-        }
-        return 'ran-ok';
-    }
-    return 'never-completed';
 }
 
 function writeReport(results: SnippetResult[]): void {
@@ -218,11 +179,7 @@ test('run every Laravel snippet across every docs page', async ({ page }) => {
                 await runBtn.click({ timeout: 10_000 });
                 await expect
                     .poll(
-                        async () => {
-                            const t = (await statusEl.textContent()) ?? '';
-                            const trimmed = t.trim();
-                            return trimmed !== '' && trimmed !== 'Running…';
-                        },
+                        async () => isTerminalStatus(((await statusEl.textContent()) ?? '').trim()),
                         {
                             intervals: [200, 500, 1000, 2000],
                             timeout: STATUS_POLL_TIMEOUT,

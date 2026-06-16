@@ -35,7 +35,9 @@ type FatalReply = {
 
 type ReadyReply = { type: 'ready' };
 
-type WorkerReply = PhpResult | TokenReply | FatalReply | ReadyReply;
+type ProgressReply = { type: 'progress'; percent: number };
+
+type WorkerReply = PhpResult | TokenReply | FatalReply | ReadyReply | ProgressReply;
 
 function describeErrorEvent(e: Event): string {
     const ev = e as ErrorEvent;
@@ -55,8 +57,15 @@ function formatFatal(data: FatalReply): Error {
 
 let workerPromise: Promise<Worker> | null = null;
 let workerFatal: Error | null = null;
+let workerProgress = 0;
+const progressListeners = new Set<(percent: number) => void>();
 const pending = new Map<number, (data: WorkerReply) => void>();
 let nextId = 0;
+
+function emitProgress(percent: number): void {
+    workerProgress = percent;
+    for (const cb of progressListeners) cb(percent);
+}
 
 function getWorker(): Promise<Worker> {
     if (workerFatal) return Promise.reject(workerFatal);
@@ -73,7 +82,12 @@ function getWorker(): Promise<Worker> {
                 fail(formatFatal(e.data));
                 return;
             }
+            if (e.data.type === 'progress') {
+                emitProgress(e.data.percent);
+                return;
+            }
             if (e.data.type !== 'ready') return;
+            emitProgress(100);
             worker.removeEventListener('message', onReady);
             worker.addEventListener('message', (event: MessageEvent<WorkerReply>) => {
                 const t = event.data.type;
@@ -98,6 +112,27 @@ function getWorker(): Promise<Worker> {
         );
     });
     return workerPromise;
+}
+
+// Overlap the worker's cold start with the user reading the page,
+// instead of paying ~10s after they click Play. Idempotent — getWorker
+// memoizes via workerPromise.
+export function prewarmWorker(): void {
+    void getWorker().catch(() => {
+        /* errors surface again on the real click */
+    });
+}
+
+// Emits the current percentage to new subscribers so the UI can render
+// the right value on the first paint without a separate getter. Updates
+// are throttled at the worker (~10/sec), so listeners can write to the
+// DOM directly.
+export function onWorkerProgress(cb: (percent: number) => void): () => void {
+    cb(workerProgress);
+    progressListeners.add(cb);
+    return () => {
+        progressListeners.delete(cb);
+    };
 }
 
 export async function runPhp(code: string): Promise<PhpResult> {
