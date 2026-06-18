@@ -18,11 +18,14 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/snippet-worker
-/public/laravel-snippet
+/public/laravel-snippets
 /dist
 /public/storage
 /storage/*.key
 /storage/pail
+/test-results
+/tests/browser/playwright-html
+/tests/browser/playwright-report.json
 /vendor
 _ide_helper.php
 Homestead.json

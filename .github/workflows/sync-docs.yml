@@ -1,0 +1,79 @@
+name: Sync laravel.com docs markdown
+
+# Pulls laravel/docs 13.x markdown corpus from GitHub and uploads it as
+# the `laravel-docs-markdown` artifact — no PR, no commit. deploy.yml
+# fetches the latest successful artifact (parallel to how it fetches
+# snippet-report from sweep.yml and laravel-docs-assets from
+# sync-assets.yml) and overlays the files into
+# `demo/resources/markdown/13.x/` before `npm run prerender` runs, so
+# the deployed /docs/ pages always carry the freshest upstream copy
+# without the source repo churning every time laravel/docs edits a page.
+#
+# Trigger logic:
+#   - daily 06:00 UTC (same hour as sync-assets — same upstream source,
+#     easier to debug together)
+#   - manual via workflow_dispatch
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-docs
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: demo/package-lock.json
+
+      - name: NPM install
+        working-directory: demo
+        run: npm ci
+
+      - name: Sync laravel/docs 13.x markdown
+        working-directory: demo
+        env:
+          # 5000/hr authenticated vs 60/hr unauthenticated — sync:docs
+          # makes ~102 requests/run (one per .md file).
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run sync:docs
+
+      - name: Detect changes vs committed baseline
+        id: diff
+        working-directory: demo
+        run: |
+          if git diff --quiet --exit-code resources/markdown/13.x; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No markdown changes — uploading empty artifact would mask a deploy-time fetch failure, skipping."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat resources/markdown/13.x
+          fi
+
+      # Cross-workflow artifact: deploy.yml fetches the latest
+      # successful run's artifact via `gh run download` and overlays the
+      # files into demo/resources/markdown/13.x/. Skipped on no-change
+      # runs so deploy keeps using the most recent actually-changed
+      # snapshot (instead of overwriting with the committed baseline).
+      - name: Upload laravel-docs-markdown artifact
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: laravel-docs-markdown
+          path: demo/resources/markdown/13.x/**
+          retention-days: 90
+          if-no-files-found: error

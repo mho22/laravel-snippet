@@ -1,0 +1,13 @@
+{
+    "id": "8d75e084ce772f17aadeda6185e7c8a33f8145de",
+    "language": "shell",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='shell' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">php <\/span><span style=\"color: #BFC7D5;\">artisan<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">queue:retry<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">ce7bb17c-cdd8-41f0-a8ec-7b4fef4e5ece<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">91401d2c-0784-4f43-824c-34f94a33c24d<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">php <\/span><span style=\"color: #BFC7D5;\">artisan<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">queue:retry<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">ce7bb17c-cdd8-41f0-a8ec-7b4fef4e5ece<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #BFC7D5;\">91401d2c-0784-4f43-824c-34f94a33c24d<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "shell"
+    }
+}

@@ -4,5 +4,17 @@ vendor/
 demo/index.html
 demo/.torchlight-cache/
 /docs/plans/
-/demo-legacy/
 /src/
+*.bak
+
+# Sweep output — produced fresh in CI by sweep.yml, never committed.
+# deploy.yml downloads the latest snippet-report artifact before prerender.
+demo/tests/browser/report.json
+demo/tests/browser/report.html
+demo/tests/browser/results/
+
+# WASM bundle — produced by `npm run build:bundle` from demo/wasm-bundle/,
+# rebuilt automatically in `npm run dev` / `npm run build` (and therefore
+# by deploy.yml's prerender step + sweep.yml's build step). Source of
+# truth is demo/wasm-bundle/.
+demo/public/laravel.zip

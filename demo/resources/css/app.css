@@ -39,10 +39,11 @@ php-snippet { display: block; margin-bottom: 24px; }
     color: rgba(255, 255, 255, 0.85);
 }
 
-.laravel-snippet__btn:disabled { opacity: 0.55; cursor: progress; }
 .laravel-snippet__copy svg { width: 20px; height: 20px; }
 .laravel-snippet__copy[data-copied="1"] { color: #5fdd7c; }
 .laravel-snippet__run svg { width: 0.95rem; height: 0.95rem; }
+.laravel-snippet__spinner { animation: laravel-snippet-spin 0.8s linear infinite; transform-origin: center; }
+@keyframes laravel-snippet-spin { to { transform: rotate(360deg); } }
 
 .laravel-snippet .code-block-wrapper pre > .laravel-snippet__output {
     position: relative;

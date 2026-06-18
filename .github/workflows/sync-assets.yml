@@ -1,0 +1,76 @@
+name: Sync laravel.com docs assets
+
+# Pulls laravel.com's current docs CSS + the font files it references
+# and uploads them as the `laravel-docs-assets` artifact — no PR, no
+# commit. deploy.yml fetches the latest successful artifact (parallel
+# to how it fetches snippet-report from sweep.yml) and overlays the
+# files into `demo/public/` before `npm run prerender` runs, so the
+# deployed /docs/ pages always carry the freshest CSS+fonts without
+# the source repo churning every time laravel.com rotates a hash.
+#
+# Trigger logic:
+#   - daily 06:00 UTC to catch laravel.com CSS hash rotations
+#   - manual via workflow_dispatch
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-assets
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: demo/package-lock.json
+
+      - name: NPM install
+        working-directory: demo
+        run: npm ci
+
+      - name: Sync laravel.com docs CSS + fonts
+        working-directory: demo
+        run: npm run sync:assets
+
+      - name: Detect changes vs committed baseline
+        id: diff
+        working-directory: demo
+        run: |
+          if git diff --quiet --exit-code public/laravel-docs.css public/laravel-docs-assets; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No CSS or font changes — uploading empty artifact would mask a deploy-time fetch failure, skipping."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat public/laravel-docs.css public/laravel-docs-assets
+          fi
+
+      # Cross-workflow artifact: deploy.yml fetches the latest
+      # successful run's artifact via `gh run download` and overlays
+      # the files into demo/public/ before prerender. Skipped on
+      # no-change runs so deploy keeps using the most recent
+      # actually-changed snapshot (instead of overwriting with the
+      # committed baseline).
+      - name: Upload laravel-docs-assets artifact
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: laravel-docs-assets
+          path: |
+            demo/public/laravel-docs.css
+            demo/public/laravel-docs-assets/**
+          retention-days: 90
+          if-no-files-found: error

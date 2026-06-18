@@ -21,7 +21,7 @@ final class MarkdownService
     }
 
     /**
-     * @return array{body: string, snippets: array<string, array{php: string, highlighted: string}>}
+     * @return array{body: string, snippets: array<string, array{php: string, highlighted: string, preamble: string}>}
      */
     public function render(string $markdown): array
     {
@@ -43,7 +43,9 @@ final class MarkdownService
             $source = $node->getLiteral();
             $id = $this->torchlight->id($language, $source);
             $cached = $this->torchlight->read($id);
-            if ($cached !== null) {
+            // Guard against legacy cache rows where the previous positional
+            // assignment wrote a response under the wrong requester's hash.
+            if ($cached !== null && ($cached['id'] ?? null) === $id) {
                 $node->data->set('torchlight', $cached);
             } else {
                 $missing[] = ['id' => $id, 'language' => $language, 'code' => $source, 'node' => $node];
@@ -60,8 +62,17 @@ final class MarkdownService
                 ],
                 $missing,
             ));
-            foreach ($missing as $i => $entry) {
-                $result = $blocks[$i] ?? null;
+            // The API can return blocks in a different order than requested
+            // (it dedupes by id), so match responses to requests by id rather
+            // than by position.
+            $byId = [];
+            foreach ($blocks as $block) {
+                if (is_array($block) && isset($block['id'])) {
+                    $byId[$block['id']] = $block;
+                }
+            }
+            foreach ($missing as $entry) {
+                $result = $byId[$entry['id']] ?? null;
                 if ($result === null) {
                     continue;
                 }

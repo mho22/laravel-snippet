@@ -1,27 +1,166 @@
 import { loadWebRuntime } from '@php-wasm/web';
-import { PHP } from '@php-wasm/universal';
+import { PHP, setPhpIniEntries } from '@php-wasm/universal';
 
 const BUNDLE_URL = new URL('../laravel.zip', import.meta.url);
 const BUNDLE_DIR = '/bundle';
-const INIT_PATH = `${BUNDLE_DIR}/init.php`;
+const INIT_PATH = `${BUNDLE_DIR}/snippet-init.php`;
+const CONTEXT_PATH = `${BUNDLE_DIR}/snippet-context.php`;
+// Fixed VFS path reused per run — overwritten each time so the in-memory
+// FS doesn't accumulate one file per snippet over a long session.
+const SNIPPET_PATH = '/tmp/snippet.php';
 
-const runtimeId = await loadWebRuntime('8.4');
-const php = new PHP(runtimeId);
-await installBundle(php);
+function describeError(err) {
+	if (err && typeof err === 'object') {
+		return {
+			message: err.message ?? String(err),
+			stack: err.stack ?? null,
+			name: err.name ?? null,
+		};
+	}
+	return { message: String(err), stack: null, name: null };
+}
 
-self.postMessage({ type: 'ready' });
+self.addEventListener('error', (e) => {
+	const detail = {
+		message: e.message || '(no message)',
+		filename: e.filename || null,
+		lineno: e.lineno ?? null,
+		colno: e.colno ?? null,
+		error: e.error ? describeError(e.error) : null,
+	};
+	console.error('[snippet-worker] window.error:', detail, e);
+	self.postMessage({ type: 'fatal', stage: 'error-event', ...detail });
+});
+
+self.addEventListener('unhandledrejection', (e) => {
+	const detail = describeError(e.reason);
+	console.error('[snippet-worker] unhandledrejection:', detail, e);
+	self.postMessage({ type: 'fatal', stage: 'unhandledrejection', ...detail });
+});
+
+// Fallback denominator while Content-Length headers are still arriving,
+// so the percentage doesn't swing wildly on the first few chunks. Real
+// sum supersedes once enough fetches have started.
+const PROGRESS_BYTES_ESTIMATE = 70 * 1024 * 1024;
+// Reserve the 95–100% band for the post-download WASM compile and zip
+// extract; emitProgress(100) on the main thread fires from `ready`.
+const PROGRESS_BYTES_CAP = 95;
+let bytesReceived = 0;
+let bytesTotal = 0;
+let lastProgressPost = 0;
+
+function postProgress() {
+	const now = performance.now();
+	if (now - lastProgressPost < 100) return;
+	lastProgressPost = now;
+	const denom = Math.max(bytesTotal, PROGRESS_BYTES_ESTIMATE);
+	const pct = Math.min(PROGRESS_BYTES_CAP, Math.floor((bytesReceived / denom) * PROGRESS_BYTES_CAP));
+	self.postMessage({ type: 'progress', percent: pct });
+}
+
+// @php-wasm exposes no progress hook for its internal WASM/ICU/intl
+// fetches, so we tee every Response through a byte counter at the
+// `self.fetch` boundary. Restored to the original after `ready` so
+// runtime fetches (e.g. Laravel's Http::get over tcpOverFetch) don't
+// emit progress messages that would overwrite "Running…".
+const originalFetch = self.fetch.bind(self);
+self.fetch = async function trackedFetch(input, init) {
+	const response = await originalFetch(input, init);
+	if (!response.ok || !response.body) return response;
+	const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+	if (contentLength > 0) bytesTotal += contentLength;
+	const reader = response.body.getReader();
+	const stream = new ReadableStream({
+		async start(controller) {
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) {
+						controller.close();
+						break;
+					}
+					bytesReceived += value.byteLength;
+					postProgress();
+					controller.enqueue(value);
+				}
+			} catch (err) {
+				controller.error(err);
+			}
+		},
+	});
+	return new Response(stream, {
+		status: response.status,
+		statusText: response.statusText,
+		headers: response.headers,
+	});
+};
+
+// Shared runtime factory — reused for boot AND for hotSwapPHPRuntime during
+// the rotation smoke test (s39 thread #1, subthread A). Same args every time
+// so V8's cached WASM module is reused after first instantiation.
+const runtimeFactory = () => loadWebRuntime('8.5', { extensions: ['intl'] });
+
+const PHP_INI_BASE = {
+	display_errors: '0',
+	html_errors: '0',
+	log_errors: '0',
+};
+
+let php;
+let initError = null;
+try {
+	const runtimeId = await runtimeFactory();
+	php = new PHP(runtimeId);
+	// Parse errors fire at PHP compile time, before any ini_set in our
+	// wrapper or any set_error_handler in snippet-init.php run. Setting
+	// these at the SAPI level keeps PHP from rendering HTML-formatted
+	// errors to stdout; the same text still reaches stderr in plain
+	// form, where the snippet renderer displays it as an error line.
+	// Suppress PHP's SAPI raw `PHP Fatal error: ...` line. The same
+	// fatal still reaches Laravel's HandleExceptions::handleShutdown
+	// → bound ExceptionHandler::renderForConsole, which writes a
+	// clean one-line stderr in snippet-init.php's custom handler.
+	// Without this, the raw line duplicates the rendered message.
+	await setPhpIniEntries(php, PHP_INI_BASE);
+	await installBundle(php);
+	self.fetch = originalFetch;
+	self.postMessage({ type: 'ready' });
+} catch (err) {
+	initError = err;
+	console.error('[snippet-worker] init failed:', err);
+	self.postMessage({
+		type: 'fatal',
+		stage: 'init',
+		message: err?.message ?? String(err),
+		stack: err?.stack ?? null,
+	});
+}
 
 self.onmessage = async (e) => {
 	const { id, code, action = 'run' } = e.data;
+	if (initError) {
+		self.postMessage({
+			type: 'fatal',
+			stage: 'init',
+			message: initError?.message ?? String(initError),
+			stack: initError?.stack ?? null,
+		});
+		return;
+	}
 	if (action === 'tokenize') {
 		await handleTokenize(id, code);
 		return;
 	}
-	const phpCode = prepareCode(code);
+	if (action === 'rotate') {
+		await handleRotate(id);
+		return;
+	}
+	const { wrapper, snippetSource } = prepareCode(code);
 
 	const tRunStart = performance.now();
 	try {
-		const result = await php.run({ code: phpCode });
+		await php.writeFile(SNIPPET_PATH, snippetSource);
+		const result = await php.run({ code: wrapper });
 		reply(id, result, tRunStart);
 	} catch (err) {
 		if (err?.response) {
@@ -38,6 +177,37 @@ self.onmessage = async (e) => {
 		});
 	}
 };
+
+async function handleRotate(id) {
+	// hotSwapPHPRuntime kills the current runtime, installs a fresh one,
+	// and deep-copies every top-level VFS entry (except /request) into the
+	// new MEMFS. Result: PHP class table, statics, opcache wiped; /bundle
+	// and /internal/shared/php.ini preserved. See node_modules/@php-wasm/
+	// universal/index.cjs `copyMEMFSNodes` for the FS-copy loop.
+	const t0 = performance.now();
+	try {
+		const newRuntime = await runtimeFactory();
+		const tCreate = performance.now() - t0;
+		await php.hotSwapPHPRuntime(newRuntime);
+		const tSwap = performance.now() - t0 - tCreate;
+		// Safety belt: PHP_INI_PATH lives in /internal/shared/php.ini and IS
+		// preserved by copyMEMFSNodes, so the new runtime *should* read the
+		// same ini at request start. Re-applying is cheap and guards against
+		// an as-yet-unknown init path that skips the file.
+		await setPhpIniEntries(php, PHP_INI_BASE);
+		const tTotal = performance.now() - t0;
+		self.postMessage({ type: 'rotated', id, tCreate, tSwap, tTotal });
+	} catch (err) {
+		self.postMessage({
+			type: 'rotated',
+			id,
+			tCreate: -1,
+			tSwap: -1,
+			tTotal: performance.now() - t0,
+			error: describeError(err),
+		});
+	}
+}
 
 async function handleTokenize(id, code) {
 	const hasOpenTag = /^<\?(?:php\b|=)/.test(code);
@@ -92,34 +262,117 @@ function stripPhpOpen(code) {
 }
 
 function prepareCode(code) {
-	// Wrap the init.php require in an IIFE so its locals ($app, $dumper, ...)
-	// don't leak into the snippet's `get_defined_vars()`. Framework state lives
-	// on static properties (Facade::setFacadeApplication, VarDumper::setHandler).
-	// Both sections use bracketed `namespace { ... }` because PHP requires
-	// uniform syntax once any namespace block is bracketed.
-	const init = `namespace {
-		ini_set('display_errors', '0');
-		(static function (): void {
-			require ${JSON.stringify(INIT_PATH)};
-		})();
-	}`;
-	// Auto-dump: if the snippet ended without explicit output, dump the last
-	// user-defined variable so something meaningful appears in the panel.
-	// The `_` prefix check covers both superglobals ($_SERVER, $_ENV, …) and
-	// our own scratch vars (`$__vars`, `$__last`).
-	const snippet = `namespace {
-${stripPhpOpen(code)}
-$__vars = array_filter(
-	get_defined_vars(),
-	static fn (string $n): bool => $n[0] !== '_' && $n !== 'GLOBALS' && $n !== 'argv' && $n !== 'argc',
-	ARRAY_FILTER_USE_KEY
-);
-$__last = array_key_last($__vars);
-if ($__last !== null) {
-	dump($__vars[$__last]);
+	// The snippet runs as its own VFS file via `require`, not as text spliced
+	// into the wrapper. This buys three things:
+	//   - top-level `return <expr>;` flows back as the require expression's
+	//     value, so the auto-dump can render it (the inline-splice version
+	//     silently dropped any `return` because it short-circuited the
+	//     fall-through dump);
+	//   - `use Illuminate\Foo;` declarations in the snippet sit at natural
+	//     file-top scope, no closure wrap needed;
+	//   - parse-error line numbers come from the snippet file directly, no
+	//     "subtract wrapper-prelude" math downstream.
+	// The snippet file is written verbatim — no trailing `return` or other
+	// scaffolding. Appending anything risks PHP blaming our injected token
+	// when the user's snippet is missing a `;` before EOF (the parse error
+	// then reads "unexpected token return" pointing at our line, which
+	// misleads anyone reading the report for upstream docs PRs).
+	// To still distinguish "user explicitly returned" from "user fell
+	// through", lean on PHP's built-in `require` semantics: an included
+	// file with no explicit `return` evaluates the `require` expression to
+	// integer 1. So `$__ret === 1` is our "no explicit return" signal.
+	// The one edge case this conflates is a snippet that literally does
+	// `return 1;` and defines no vars — it'll show empty output. In the
+	// Laravel docs corpus that shape essentially doesn't occur, and the
+	// alternative (always trust $__ret) would mis-display `1` for every
+	// snippet that just runs side-effecting code without returning.
+	// The init require sits inside an IIFE so its locals ($app, $dumper,
+	// ...) don't leak into the snippet's `get_defined_vars()`. Framework
+	// state lives on static properties (Facade::setFacadeApplication,
+	// VarDumper::setHandler). The context require is NOT wrapped: its
+	// locals ($user, $request, $browser, ...) are intentionally injected
+	// into the snippet's scope. $__pre captures the pre-injected vars so
+	// the auto-dump can ignore them.
+	const wrapper = `<?php
+namespace {
+	ini_set('display_errors', '0');
+	(static function (): void {
+		require ${JSON.stringify(INIT_PATH)};
+	})();
+
+	// The pre-scan that populates \$GLOBALS['__declared_classes'] runs
+	// inside snippet-init.php (before Laravel bootstrap), so both
+	// bootstrap/providers.php and snippet-context.php can read it. No
+	// per-snippet work needed here in the wrapper.
+
+	require ${JSON.stringify(CONTEXT_PATH)};
+	$__pre = get_defined_vars();
+
+	// Tinker/REPL-style auto-dump: rewrite bare top-level expression
+	// statements (e.g. \`Str::unwrap('-x-', '-');\`) to wrap their result
+	// in __autodump_value(...) so a non-null return is rendered. The
+	// rewriter (defined in snippet-init.php) bails on snippets that
+	// already produce explicit output, so echo/dump/dd/return paths are
+	// untouched. Insertions add no newlines, so error line numbers stay
+	// aligned with the source the user sees.
+	$__rewritten = \\__autodump_rewrite(file_get_contents(${JSON.stringify(SNIPPET_PATH)}));
+	if ($__rewritten !== null) {
+		file_put_contents(${JSON.stringify(SNIPPET_PATH)}, $__rewritten);
+	}
+
+	// Capture snippet output so the "Defined: <FQCN>" fallback below can
+	// see whether the snippet body produced anything at all. ob_start adds
+	// no observable behavior — its contents flush to stdout at end-of-
+	// wrapper via ob_end_flush, exactly as if it were never wrapped.
+	ob_start();
+	$__ret = require ${JSON.stringify(SNIPPET_PATH)};
+
+	// Auto-dump: dump the last user-defined variable so something
+	// meaningful appears when the snippet ends without explicit output.
+	// Underscore-prefix filter covers superglobals ($_SERVER, ...) and
+	// our scratch vars ($__pre, $__ret, $__vars, $__last). Vars injected
+	// by snippet-context.php pass through only if the snippet reassigned
+	// them — comparing by !== gives object identity for instances and
+	// value-or-type difference for scalars/arrays.
+	$__vars = array_filter(
+		get_defined_vars(),
+		static fn ($v, string $n): bool =>
+			$n[0] !== '_'
+			&& $n !== 'GLOBALS'
+			&& $n !== 'argv'
+			&& $n !== 'argc'
+			&& (!array_key_exists($n, $__pre) || $__pre[$n] !== $v),
+		ARRAY_FILTER_USE_BOTH
+	);
+	if ($__ret !== 1) {
+		dump($__ret);
+	} elseif ($__rewritten === null) {
+		// Only fall back to dumping the last user var when the autodump
+		// rewriter did NOT wrap any statements. If it did, the bare-
+		// expression results ARE the display surface; dumping an
+		// intermediate var on top surfaces a confusing trailing dump
+		// of the setup receiver (e.g. \$collection after
+		// \$collection->after(3); \$collection->after(5);).
+		$__last = array_key_last($__vars);
+		if ($__last !== null) {
+			dump($__vars[$__last]);
+		} elseif (ob_get_length() === 0 && !empty($GLOBALS['__declared_classes'] ?? [])) {
+			// Declaration-only snippet (class / interface / trait / enum,
+			// no return value, no fresh locals, no other output). The
+			// large no-output bucket is dominated by docs fences that
+			// just show how to define a class (queues, events, mail,
+			// container, etc.) — emit the declared FQCNs so those
+			// classify as ran-ok instead of no-output.
+			foreach ($GLOBALS['__declared_classes'] as $__cls) {
+				dump('Defined: ' . $__cls);
+			}
+		}
+	}
+	ob_end_flush();
 }
-}`;
-	return `<?php\n${init}\n${snippet}\n`;
+`;
+	const snippetSource = `<?php\n${stripPhpOpen(code)}\n`;
+	return { wrapper, snippetSource };
 }
 
 function reply(id, response, tRunStart) {

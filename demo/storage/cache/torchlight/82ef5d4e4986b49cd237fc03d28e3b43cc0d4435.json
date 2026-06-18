@@ -1,0 +1,13 @@
+{
+    "id": "82ef5d4e4986b49cd237fc03d28e3b43cc0d4435",
+    "language": "shell",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='shell' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">xphp <\/span><span style=\"color: #BFC7D5;\">\/path\/to\/script<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #BFC7D5;\">xphp <\/span><span style=\"color: #BFC7D5;\">\/path\/to\/script<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "shell"
+    }
+}

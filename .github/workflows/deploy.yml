@@ -3,19 +3,33 @@ name: Deploy demo to GitHub Pages
 on:
   push:
     branches: [main]
+  # Auto-publish after a successful sweep so /report refreshes without
+  # a manual trigger; ditto for fresh laravel.com CSS/font assets. The
+  # trigger fires on every completion, but `gh run list --status=success`
+  # in the fetch step filters out failures.
+  workflow_run:
+    workflows:
+      - 'Refresh snippet sweep report'
+      - 'Sync laravel.com docs assets'
+      - 'Sync laravel.com docs markdown'
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read  # needed by `gh run download` to fetch sweep.yml artifacts
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false  # don't kill an in-flight sweep deploy
 
 jobs:
   build:
+    # Skip re-deploys triggered by failed sweep runs (the guard tripping,
+    # CI timeout, etc.). On push/workflow_dispatch this is always true.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,10 +43,10 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: Setup Node 20
+      - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: demo/package-lock.json
 
@@ -46,11 +60,133 @@ jobs:
 
       - name: Prepare Laravel env
         working-directory: demo
+        env:
+          # sync-docs.yml refreshes the upstream markdown daily; any new
+          # code blocks miss the committed Torchlight cache, and
+          # TorchlightClient::fetch() then needs the token to highlight
+          # them. Without this, MarkdownService throws and Laravel
+          # returns 500 on the affected page (e.g. ai-sdk).
+          TORCHLIGHT_TOKEN: ${{ secrets.TORCHLIGHT_TOKEN }}
         run: |
           cp .env.example .env
           php artisan key:generate
           touch database/database.sqlite
           php artisan migrate --force
+          echo "TORCHLIGHT_TOKEN=${TORCHLIGHT_TOKEN}" >> .env
+
+      # report.json is no longer committed — pull it from the most recent
+      # successful sweep so ReportController can read it during prerender.
+      # If no sweep has run yet (or its artifact has expired past 90 days),
+      # the Inertia /report page still renders its empty-state branch.
+      - name: Fetch latest sweep report (best-effort)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          LATEST_RUN_ID=$(gh run list \
+            --workflow=sweep.yml \
+            --branch=main \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+          if [ -z "$LATEST_RUN_ID" ]; then
+            echo "No successful sweep runs found — /report will render its empty state."
+            exit 0
+          fi
+          echo "Downloading snippet-report from sweep run #$LATEST_RUN_ID"
+          if ! gh run download "$LATEST_RUN_ID" \
+              --name snippet-report \
+              --dir demo/tests/browser/ \
+              --repo "$GITHUB_REPOSITORY"; then
+            echo "::warning::snippet-report artifact not found on run #$LATEST_RUN_ID (likely expired) — /report will render its empty state."
+          fi
+
+      # laravel-docs CSS + fonts are committed at a known-good baseline
+      # but laravel.com rotates the CSS hash + occasionally renames a
+      # font file. sync-assets.yml runs daily, downloads fresh copies,
+      # uploads `laravel-docs-assets`; we overlay that here so the
+      # deployed site stays in sync without committing each rotation
+      # to main. Skipped silently if no successful refresh has run yet
+      # (the committed baseline is used) or if the artifact expired.
+      #
+      # `gh run download` refuses to overwrite existing files (errors with
+      # `file exists` and silently no-ops the rest of the extract), and
+      # the laravel-docs.css + laravel-docs-assets/ baselines ARE committed,
+      # so we extract into a tmp dir and `cp -fR` over. Same pattern is
+      # reused for laravel-docs-markdown below.
+      - name: Fetch latest laravel-docs assets (best-effort)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          LATEST_RUN_ID=$(gh run list \
+            --workflow=sync-assets.yml \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+          if [ -z "$LATEST_RUN_ID" ]; then
+            echo "No successful sync-assets runs found — using committed laravel-docs.css + fonts baseline."
+            exit 0
+          fi
+          echo "Downloading laravel-docs-assets from sync-assets run #$LATEST_RUN_ID"
+          TMPDIR=$(mktemp -d)
+          trap 'rm -rf "$TMPDIR"' EXIT
+          if gh run download "$LATEST_RUN_ID" \
+              --name laravel-docs-assets \
+              --dir "$TMPDIR" \
+              --repo "$GITHUB_REPOSITORY"; then
+            cp -fR "$TMPDIR"/. demo/public/
+          else
+            echo "::warning::laravel-docs-assets artifact not found on run #$LATEST_RUN_ID (likely expired) — falling back to committed baseline."
+          fi
+
+      # laravel-docs markdown corpus mirrors the assets pattern: committed
+      # baseline gets overlaid by the latest sync-docs.yml artifact, so
+      # the deployed prerender always reflects the freshest upstream
+      # laravel/docs without committing each refresh. Same /tmp + cp -fR
+      # dance to dodge `gh run download`'s file-exists refusal.
+      - name: Fetch latest laravel-docs markdown (best-effort)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          LATEST_RUN_ID=$(gh run list \
+            --workflow=sync-docs.yml \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+          if [ -z "$LATEST_RUN_ID" ]; then
+            echo "No successful sync-docs runs found — using committed markdown baseline."
+            exit 0
+          fi
+          echo "Downloading laravel-docs-markdown from sync-docs run #$LATEST_RUN_ID"
+          TMPDIR=$(mktemp -d)
+          trap 'rm -rf "$TMPDIR"' EXIT
+          if gh run download "$LATEST_RUN_ID" \
+              --name laravel-docs-markdown \
+              --dir "$TMPDIR" \
+              --repo "$GITHUB_REPOSITORY"; then
+            cp -fR "$TMPDIR"/. demo/resources/markdown/13.x/
+          else
+            echo "::warning::laravel-docs-markdown artifact not found on run #$LATEST_RUN_ID (likely expired) — falling back to committed baseline."
+          fi
+
+      # The WASM bundle (laravel.zip) is built by build-bundle.ts during the
+      # `npm run build` that prerender.ts runs internally. Its .env is
+      # gitignored, so CI ships only .env.example — no APP_KEY — and every
+      # runnable fence on the deployed site would throw MissingAppKeyException
+      # when a visitor hits Run. Install vendor first so artisan can bootstrap
+      # (build-bundle re-runs composer, but it's idempotent/warm), then mint
+      # the bundle .env with `php artisan key:generate` BEFORE prerender.
+      - name: Prepare wasm-bundle env
+        working-directory: demo/wasm-bundle
+        run: |
+          composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+          cp .env.example .env
+          php artisan key:generate
 
       - name: Prerender static site
         working-directory: demo

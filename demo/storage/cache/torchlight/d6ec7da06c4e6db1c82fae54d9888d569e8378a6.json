@@ -1,0 +1,13 @@
+{
+    "id": "d6ec7da06c4e6db1c82fae54d9888d569e8378a6",
+    "language": "php",
+    "theme": "olaolu-palenight",
+    "wrapped": "<pre><code data-theme='olaolu-palenight' data-lang='php' class='torchlight' style='background-color: #292D3E; --theme-selection-background: #7580B850;'><!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #FFCB8B;\">Notification<\/span><span style=\"color: #89DDFF;\">::<\/span><span style=\"color: #82AAFF;\">sendNow<\/span><span style=\"color: #BFC7D5;\">(<\/span><span style=\"color: #BEC5D4;\">$developers<\/span><span style=\"color: #BFC7D5;\">, <\/span><span style=\"color: #89DDFF;\">new<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #FFCB8B;\">DeploymentCompleted<\/span><span style=\"color: #BFC7D5;\">(<\/span><span style=\"color: #BEC5D4;\">$deployment<\/span><span style=\"color: #BFC7D5;\">));<\/span><\/div><\/code><\/pre>",
+    "highlighted": "<!-- Syntax highlighted by torchlight.dev --><div class='line'><span style=\"color:#4c5374; text-align: right; -webkit-user-select: none; user-select: none;\" class=\"line-number\">1<\/span><span style=\"color: #FFCB8B;\">Notification<\/span><span style=\"color: #89DDFF;\">::<\/span><span style=\"color: #82AAFF;\">sendNow<\/span><span style=\"color: #BFC7D5;\">(<\/span><span style=\"color: #BEC5D4;\">$developers<\/span><span style=\"color: #BFC7D5;\">, <\/span><span style=\"color: #89DDFF;\">new<\/span><span style=\"color: #BFC7D5;\"> <\/span><span style=\"color: #FFCB8B;\">DeploymentCompleted<\/span><span style=\"color: #BFC7D5;\">(<\/span><span style=\"color: #BEC5D4;\">$deployment<\/span><span style=\"color: #BFC7D5;\">));<\/span><\/div>",
+    "classes": "torchlight",
+    "styles": "background-color: #292D3E; --theme-selection-background: #7580B850;",
+    "attrs": {
+        "data-theme": "olaolu-palenight",
+        "data-lang": "php"
+    }
+}
